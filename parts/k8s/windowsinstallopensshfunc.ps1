@@ -8,8 +8,6 @@ Install-OpenSSH {
         $SSHKey
     )
 
-    $sshdconfigpath = "C:\ProgramData\ssh\sshd_config"
-
     Write-Host "Installing OpenSSH"
     $isAvailable = Get-WindowsCapability -Online | ? Name -like 'OpenSSH*'
 
@@ -20,8 +18,28 @@ Install-OpenSSH {
 
     Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
     
+    $adminpath = "$env:USERPROFILE\.ssh"
+    $adminfile = "authorized_keys"
+
+    
+    if (!(Test-Path "$adminpath")) {
+        Write-Host "Created new file and text content added"
+        New-Item -path $env:USERPROFILE -name ".ssh" -type "directory" -value ""
+        New-Item -path $adminpath -name $adminfile -type "file" -value ""
+    } 
+
+    Write-Host "Adding key"
+    Add-Content $adminpath\$adminfile $SSHKey
+
+    Write-Host "Setting required permissions"
+    icacls $adminpath\$adminfile /remove "NT AUTHORITY\Authenticated Users"
+    icacls $adminpath\$adminfile /inheritance:r
+
+    $sshdconfigpath = "C:\ProgramData\ssh\sshd_config"
+    Copy-Item -Path $sshdconfigpath -Destination "$sshdconfigpath.original"
+
     $updateNeeded=$false
-    $content = Get-Content $sshdconfigpath| Foreach-Object {
+    $content = Get-Content "$sshdconfigpath.original" | Foreach-Object {
         $k = [regex]::Split($_,' ')
        
         if(($k[0] -eq "AuthorizedKeysFile") -and ($k[-1] -ne ".ssh/authorized_keys")) { 
@@ -33,24 +51,9 @@ Install-OpenSSH {
     } 
    
     if($updateNeeded) {
+        Write-Log "Overriding $sshdconfigpath. Original copy found at $sshdconfigpath'.original'"
         Write-Output $content | Out-File -FilePath $sshdconfigpath
     }
-
-    $adminpath = "c:\Users\$WinUser\.ssh\"
-    $adminfile = "authorized_keys"
-
-    
-    if (!(Test-Path "$adminpath")) {
-        Write-Host "Created new file and text content added"
-        New-Item -path $adminpath -name $adminfile -type "file" -value ""
-    } 
-
-    Write-Host "Adding key"
-    Add-Content $adminpath\$adminfile $SSHKey
-
-    Write-Host "Setting required permissions"
-    icacls $adminpath\$adminfile /remove "NT AUTHORITY\Authenticated Users"
-    icacls $adminpath\$adminfile /inheritance:r
 
     Start-Service sshd
 
