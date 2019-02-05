@@ -242,10 +242,12 @@ try
 
         # Install OpenSSH if SSH enabled
         $sshEnabled = [System.Convert]::ToBoolean("{{ WindowsSSHEnabled }}")
+        Write-Log "SSH is enabled: $sshEnabled"
 
         if ( $sshEnabled ) {
             $SSHKey = "{{ WrapAsParameter "sshRSAPublicKey" }}"
-            Install-OpenSSH -SSHKey $SSHKey
+            $WinUser = "{{ WrapAsParameter "windowsAdminUsername" }}"
+            Install-OpenSSH -SSHKey $SSHKey -WinUser $WinUser
         }
 
         Write-Log "Disable Internet Explorer compat mode and set homepage"
